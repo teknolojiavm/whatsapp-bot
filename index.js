@@ -1,3 +1,54 @@
+require("dotenv").config();
+
+const express = require("express");
+const axios = require("axios");
+
+const app = express();
+app.use(express.json());
+
+const PORT = process.env.PORT || 3000;
+const META_GRAPH_BASE =
+  process.env.META_GRAPH_BASE || "https://graph.facebook.com/v22.0";
+
+function requiredEnv(name) {
+  const value = process.env[name];
+  if (!value) {
+    throw new Error(`Missing required environment variable: ${name}`);
+  }
+  return value;
+}
+
+function getTextFromResponse(data) {
+  if (typeof data?.output_text === "string" && data.output_text.trim()) {
+    return data.output_text.trim();
+  }
+
+  const output = Array.isArray(data?.output) ? data.output : [];
+  for (const item of output) {
+    const contents = Array.isArray(item?.content) ? item.content : [];
+    for (const content of contents) {
+      if (content?.type === "output_text" && typeof content.text === "string") {
+        return content.text.trim();
+      }
+    }
+  }
+
+  return "Su anda cevap uretemedim. Lutfen tekrar dener misin?";
+}
+
+async function askOpenAI(userText) {
+  const apiKey = requiredEnv("OPENAI_API_KEY");
+  const model = process.env.OPENAI_MODEL || "gpt-4.1-mini";
+  const systemPrompt =
+    process.env.SYSTEM_PROMPT ||
+    "Sen yardimci, kisa, net ve Turkce cevap veren bir WhatsApp asistansin.";
+
+  const response = await axios.post(
+    "https://api.openai.com/v1/responses",
+    {
+      model,
+      instructions: systemPrompt,
+      input: userText
     },
     {
       headers: {
@@ -151,3 +202,4 @@ app.post("/webhook", async (req, res) => {
 app.listen(PORT, () => {
   console.log(`Server listening on port ${PORT}`);
 });
+
